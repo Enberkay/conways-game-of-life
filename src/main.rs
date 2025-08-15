@@ -1,147 +1,88 @@
 use macroquad::prelude::*;
 use macroquad::rand::gen_range;
-use std::collections::HashSet;
+use std::collections::{HashMap, HashSet};
 
-#[derive(Clone, Copy, PartialEq, Eq, Hash)]
+// ========== Config ==========
+const CELL_SIZE: i32 = 10;
+const RANDOM_DENSITY: f32 = 0.20;
+const SPEED_MIN: f32 = 1.0;
+const SPEED_MAX: f32 = 120.0;
+const SPEED_INIT: f32 = 10.0;
+
+// ========== Core Types ==========
+#[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
 struct Position(i32, i32);
 
+impl Position {
+    #[inline]
+    fn offset(self, dx: i32, dy: i32) -> Self {
+        Position(self.0 + dx, self.1 + dy)
+    }
+}
+
+// เพื่อนบ้าน 8 ทิศ แบบคงที่ (ลดการสร้าง tuple ซ้ำ)
+const NEIGHBOR_OFFSETS: [(i32, i32); 8] = [
+    (-1, -1), (0, -1), (1, -1),
+    (-1,  0),          (1,  0),
+    (-1,  1), (0,  1), (1,  1),
+];
+
+// ========== Game State ==========
+#[derive(Default)]
 struct GameOfLife {
-    live_cells: HashSet<Position>,
+    live: HashSet<Position>,
     width: i32,
     height: i32,
-    cell_size: i32,
-    generation: u32,
+    cell: i32,
+    generation: u64,
+    wrap_world: bool,
+    show_grid: bool,
 }
 
 impl GameOfLife {
     fn new(width: i32, height: i32, cell_size: i32) -> Self {
         Self {
-            live_cells: HashSet::new(),
+            live: HashSet::new(),
             width,
             height,
-            cell_size,
+            cell: cell_size,
             generation: 0,
+            wrap_world: false,
+            show_grid: true,
         }
+    }
+
+    #[inline] fn in_bounds(&self, x: i32, y: i32) -> bool {
+        (0..self.width).contains(&x) && (0..self.height).contains(&y)
+    }
+
+    #[inline] fn wrap(&self, x: i32, y: i32) -> Position {
+        let mut nx = x % self.width;
+        let mut ny = y % self.height;
+        if nx < 0 { nx += self.width; }
+        if ny < 0 { ny += self.height; }
+        Position(nx, ny)
     }
 
     fn add_cell(&mut self, x: i32, y: i32) {
-        self.live_cells.insert(Position(x, y));
+        let p = if self.wrap_world { self.wrap(x, y) } else { Position(x, y) };
+        if self.wrap_world || self.in_bounds(p.0, p.1) {
+            self.live.insert(p);
+        }
     }
 
-    fn is_alive(&self, pos: &Position) -> bool {
-        self.live_cells.contains(pos)
+    fn toggle_cell(&mut self, x: i32, y: i32) {
+        let p = if self.wrap_world { self.wrap(x, y) } else { Position(x, y) };
+        if !(self.wrap_world || self.in_bounds(p.0, p.1)) { return; }
+        if !self.live.remove(&p) { self.live.insert(p); }
     }
 
-    fn count_neighbors(&self, pos: &Position) -> usize {
-        let mut count = 0;
-        for dy in -1..=1 {
-            for dx in -1..=1 {
-                if dx == 0 && dy == 0 {
-                    continue;
-                }
-                let neighbor = Position(pos.0 + dx, pos.1 + dy);
-                if self.is_alive(&neighbor) {
-                    count += 1;
-                }
-            }
-        }
-        count
+    fn clear(&mut self) {
+        self.live.clear();
+        self.generation = 0;
     }
 
-    fn next_generation(&mut self) {
-        let mut new_set = HashSet::new();
-        let mut candidates = HashSet::new();
-
-        for cell in &self.live_cells {
-            candidates.insert(*cell);
-            for dy in -1..=1 {
-                for dx in -1..=1 {
-                    if dx == 0 && dy == 0 {
-                        continue;
-                    }
-                    candidates.insert(Position(cell.0 + dx, cell.1 + dy));
-                }
-            }
-        }
-
-        for pos in candidates {
-            if pos.0 < 0 || pos.0 >= self.width || pos.1 < 0 || pos.1 >= self.height {
-                continue; // Skip out-of-bound cells
-            }
-
-            let neighbors = self.count_neighbors(&pos);
-
-            if self.is_alive(&pos) && (neighbors == 2 || neighbors == 3) {
-                new_set.insert(pos);
-            } else if !self.is_alive(&pos) && neighbors == 3 {
-                new_set.insert(pos);
-            }
-        }
-
-        self.live_cells = new_set;
-        self.generation += 1;
-    }
-
-    fn draw(&self) {
-        clear_background(BLACK);
-
-        // Draw live cells
-        for cell in &self.live_cells {
-            let x = cell.0 * self.cell_size;
-            let y = cell.1 * self.cell_size;
-            draw_rectangle(
-                x as f32,
-                y as f32,
-                self.cell_size as f32,
-                self.cell_size as f32,
-                GREEN,
-            );
-        }
-
-        // Draw grid lines
-        let color = Color::new(0.15, 0.15, 0.15, 1.0);
-        for x in 0..=self.width {
-            draw_line(
-                (x * self.cell_size) as f32,
-                0.0,
-                (x * self.cell_size) as f32,
-                (self.height * self.cell_size) as f32,
-                1.0,
-                color,
-            );
-        }
-        for y in 0..=self.height {
-            draw_line(
-                0.0,
-                (y * self.cell_size) as f32,
-                (self.width * self.cell_size) as f32,
-                (y * self.cell_size) as f32,
-                1.0,
-                color,
-            );
-        }
-
-        // Draw red border around simulation area
-        draw_rectangle_lines(
-            0.0,
-            0.0,
-            (self.width * self.cell_size) as f32,
-            (self.height * self.cell_size) as f32,
-            3.0,
-            RED,
-        );
-
-        // Draw generation and FPS text
-        draw_text(
-            &format!("Generation: {} | FPS: {:.1}", self.generation, get_fps()),
-            10.0,
-            20.0,
-            20.0,
-            WHITE,
-        );
-    }
-
-    fn add_random(&mut self, density: f32) {
+    fn random_fill(&mut self, density: f32) {
         for y in 0..self.height {
             for x in 0..self.width {
                 if gen_range(0.0, 1.0) < density {
@@ -151,147 +92,166 @@ impl GameOfLife {
         }
     }
 
-    fn add_glider(&mut self, x: i32, y: i32) {
-        let pattern = [(1, 0), (2, 1), (0, 2), (1, 2), (2, 2)];
-        for (dx, dy) in pattern {
-            self.add_cell(x + dx, y + dy);
-        }
-    }
+    /// อัปเดตรุ่นถัดไป: นับเพื่อนบ้านด้วย HashMap ครั้งเดียว -> ตัดสินกฎ
+    fn next_generation(&mut self) {
+        let mut counts: HashMap<Position, u8> = HashMap::with_capacity(self.live.len() * 8 + 8);
 
-    fn add_block(&mut self, x: i32, y: i32) {
-        for dx in 0..2 {
-            for dy in 0..2 {
-                self.add_cell(x + dx, y + dy);
+        // นับเพื่อนบ้านของทุก cell ที่มีชีวิต (แจกคะแนนให้ 8 ทิศ)
+        for &cell in &self.live {
+            for (dx, dy) in NEIGHBOR_OFFSETS {
+                let p = if self.wrap_world {
+                    self.wrap(cell.0 + dx, cell.1 + dy)
+                } else {
+                    cell.offset(dx, dy)
+                };
+                if self.wrap_world || self.in_bounds(p.0, p.1) {
+                    *counts.entry(p).or_insert(0) += 1;
+                }
             }
         }
+
+        // สร้างชุดใหม่จาก count: 3 -> เกิดใหม่, 2 && เดิมมีชีวิต -> รอด
+        let mut next = HashSet::with_capacity(self.live.len());
+        for (pos, n) in counts {
+            let alive = self.live.contains(&pos);
+            if n == 3 || (alive && n == 2) {
+                next.insert(pos);
+            }
+        }
+
+        self.live = next;
+        self.generation += 1;
     }
 
+    // ---------- Rendering ----------
+    fn draw(&self) {
+        clear_background(BLACK);
+
+        // cells
+        for &Position(x, y) in &self.live {
+            draw_rectangle(
+                (x * self.cell) as f32,
+                (y * self.cell) as f32,
+                self.cell as f32,
+                self.cell as f32,
+                GREEN,
+            );
+        }
+
+        // grid
+        if self.show_grid {
+            let color = Color::new(0.15, 0.15, 0.15, 1.0);
+            for x in 0..=self.width {
+                draw_line(
+                    (x * self.cell) as f32, 0.0,
+                    (x * self.cell) as f32, (self.height * self.cell) as f32,
+                    1.0, color,
+                );
+            }
+            for y in 0..=self.height {
+                draw_line(
+                    0.0, (y * self.cell) as f32,
+                    (self.width * self.cell) as f32, (y * self.cell) as f32,
+                    1.0, color,
+                );
+            }
+        }
+
+        // border
+        draw_rectangle_lines(
+            0.0, 0.0,
+            (self.width * self.cell) as f32,
+            (self.height * self.cell) as f32,
+            3.0, RED,
+        );
+    }
+
+    fn draw_hud(&self, paused: bool, speed: f32) {
+        let info = format!(
+            "Gen:{} | FPS:{:.0} | {} | speed:{:.1} gen/s | grid:{} | wrap:{}",
+            self.generation, get_fps() as f32,
+            if paused { "PAUSED" } else { "RUN" },
+            speed,
+            on_off(self.show_grid),
+            on_off(self.wrap_world),
+        );
+        draw_text(&info, 10.0, 22.0, 22.0, WHITE);
+
+        let help = "Space: Pause | N: Step | -/=: Speed | R: Random | C: Clear | G: Grid | W: Wrap | Esc: Menu | LMB: Draw/Erase";
+        draw_text(help, 10.0, 46.0, 18.0, GRAY);
+    }
+
+    // ---------- Patterns ----------
+    fn seed(&mut self, pattern: usize) {
+        let gw = self.width;
+        let gh = self.height;
+        match pattern {
+            0 => self.add_glider(gw / 2, gh / 2),
+            1 => self.random_fill(RANDOM_DENSITY),
+            2 => self.add_block(10, 10),
+            3 => self.add_blinker(gw / 2 - 1, gh / 2),
+            4 => self.add_beacon(10, 10),
+            5 => self.add_rpentomino(gw / 2, gh / 2),
+            6 => self.add_acorn(10, 10),
+            7 => self.add_diehard(10, 10),
+            8 => self.add_gosper_gun(1, 1),
+            9 => self.add_pentadecathlon(gw / 2 - 4, gh / 2),
+            _ => {}
+        }
+    }
+
+    fn add_glider(&mut self, x: i32, y: i32) {
+        for (dx, dy) in [(1,0),(2,1),(0,2),(1,2),(2,2)] { self.add_cell(x+dx, y+dy); }
+    }
+    fn add_block(&mut self, x: i32, y: i32) {
+        for dx in 0..2 { for dy in 0..2 { self.add_cell(x+dx, y+dy); } }
+    }
     fn add_blinker(&mut self, x: i32, y: i32) {
-        for dx in 0..3 {
-            self.add_cell(x + dx, y);
-        }
+        for dx in 0..3 { self.add_cell(x+dx, y); }
     }
-
     fn add_beacon(&mut self, x: i32, y: i32) {
-        self.add_cell(x, y);
-        self.add_cell(x + 1, y);
-        self.add_cell(x, y + 1);
-        self.add_cell(x + 2, y + 3);
-        self.add_cell(x + 3, y + 2);
-        self.add_cell(x + 3, y + 3);
+        for (dx,dy) in [(0,0),(1,0),(0,1),(2,3),(3,2),(3,3)] { self.add_cell(x+dx, y+dy); }
     }
-
     fn add_rpentomino(&mut self, x: i32, y: i32) {
-        let pattern = [(1, 0), (2, 0), (0, 1), (1, 1), (1, 2)];
-        for (dx, dy) in pattern {
-            self.add_cell(x + dx, y + dy);
-        }
+        for (dx,dy) in [(1,0),(2,0),(0,1),(1,1),(1,2)] { self.add_cell(x+dx, y+dy); }
     }
-
     fn add_acorn(&mut self, x: i32, y: i32) {
-        let pattern = [(1, 0), (3, 1), (0, 2), (1, 2), (4, 2), (5, 2), (6, 2)];
-        for (dx, dy) in pattern {
-            self.add_cell(x + dx, y + dy);
-        }
+        for (dx,dy) in [(1,0),(3,1),(0,2),(1,2),(4,2),(5,2),(6,2)] { self.add_cell(x+dx, y+dy); }
     }
-
     fn add_diehard(&mut self, x: i32, y: i32) {
-        let pattern = [(6, 0), (0, 1), (1, 1), (1, 2), (5, 2), (6, 2), (7, 2)];
-        for (dx, dy) in pattern {
-            self.add_cell(x + dx, y + dy);
-        }
+        for (dx,dy) in [(6,0),(0,1),(1,1),(1,2),(5,2),(6,2),(7,2)] { self.add_cell(x+dx, y+dy); }
     }
-
     fn add_gosper_gun(&mut self, x: i32, y: i32) {
-        let pattern = [
-            (24, 0),
-            (22, 1),
-            (24, 1),
-            (12, 2),
-            (13, 2),
-            (20, 2),
-            (21, 2),
-            (34, 2),
-            (35, 2),
-            (11, 3),
-            (15, 3),
-            (20, 3),
-            (21, 3),
-            (34, 3),
-            (35, 3),
-            (0, 4),
-            (1, 4),
-            (10, 4),
-            (16, 4),
-            (20, 4),
-            (21, 4),
-            (0, 5),
-            (1, 5),
-            (10, 5),
-            (14, 5),
-            (16, 5),
-            (17, 5),
-            (22, 5),
-            (24, 5),
-            (10, 6),
-            (16, 6),
-            (24, 6),
-            (11, 7),
-            (15, 7),
-            (12, 8),
-            (13, 8),
+        let pts = [
+            (24,0),(22,1),(24,1),(12,2),(13,2),(20,2),(21,2),(34,2),(35,2),
+            (11,3),(15,3),(20,3),(21,3),(34,3),(35,3),(0,4),(1,4),(10,4),(16,4),
+            (20,4),(21,4),(0,5),(1,5),(10,5),(14,5),(16,5),(17,5),(22,5),(24,5),
+            (10,6),(16,6),(24,6),(11,7),(15,7),(12,8),(13,8),
         ];
-        for (dx, dy) in pattern {
-            self.add_cell(x + dx, y + dy);
-        }
+        for (dx,dy) in pts { self.add_cell(x+dx, y+dy); }
     }
-
     fn add_pentadecathlon(&mut self, x: i32, y: i32) {
-        let pattern = [
-            (0, 0),
-            (1, 0),
-            (2, 0),
-            (3, 0),
-            (1, -1),
-            (1, 1),
-            (4, -1),
-            (4, 1),
-            (5, 0),
-            (6, 0),
-            (7, 0),
-            (8, 0),
-        ];
-        for (dx, dy) in pattern {
-            self.add_cell(x + dx, y + dy);
+        for (dx,dy) in [(0,0),(1,0),(2,0),(3,0),(1,-1),(1,1),(4,-1),(4,1),(5,0),(6,0),(7,0),(8,0)] {
+            self.add_cell(x+dx, y+dy);
         }
     }
 }
 
+// ========== Menus ==========
 async fn choose_resolution(sizes: &[(i32, i32)]) -> usize {
-    let mut selected = 1;
+    let mut selected = 1usize;
     loop {
         clear_background(DARKGRAY);
         draw_text("Select screen size:", 20.0, 50.0, 30.0, WHITE);
         for (i, (w, h)) in sizes.iter().enumerate() {
             let marker = if i == selected { ">" } else { " " };
-            draw_text(
-                &format!("{} {}x{}", marker, w, h),
-                40.0,
-                100.0 + i as f32 * 30.0,
-                25.0,
-                WHITE,
-            );
+            draw_text(&format!("{} {}x{}", marker, w, h), 40.0, 100.0 + i as f32 * 30.0, 25.0, WHITE);
         }
-        draw_text("Enter to confirm", 20.0, 250.0, 25.0, GREEN);
-        if is_key_pressed(KeyCode::Up) {
-            selected = (selected + sizes.len() - 1) % sizes.len();
-        }
-        if is_key_pressed(KeyCode::Down) {
-            selected = (selected + 1) % sizes.len();
-        }
-        if is_key_pressed(KeyCode::Enter) {
-            break;
-        }
+        draw_text("Enter to confirm", 20.0, 260.0, 25.0, GREEN);
+
+        if is_key_pressed(KeyCode::Up) { selected = (selected + sizes.len() - 1) % sizes.len(); }
+        if is_key_pressed(KeyCode::Down) { selected = (selected + 1) % sizes.len(); }
+        if is_key_pressed(KeyCode::Enter) { break; }
         next_frame().await;
     }
     next_frame().await;
@@ -299,90 +259,93 @@ async fn choose_resolution(sizes: &[(i32, i32)]) -> usize {
 }
 
 async fn choose_pattern() -> Option<usize> {
-    let pattern_names = [
-        "Glider",
-        "Random",
-        "Block",
-        "Blinker",
-        "Beacon",
-        "R-pentomino",
-        "Acorn",
-        "Diehard",
-        "Gosper Gun",
-        "Pentadecathlon",
+    let names = [
+        "Glider","Random","Block","Blinker","Beacon",
+        "R-pentomino","Acorn","Diehard","Gosper Gun","Pentadecathlon",
     ];
-    let mut selected = 0;
+    let mut selected = 0usize;
     loop {
         clear_background(DARKBLUE);
         draw_text("Select pattern:", 20.0, 50.0, 30.0, WHITE);
-        for (i, name) in pattern_names.iter().enumerate() {
+        for (i, name) in names.iter().enumerate() {
             let marker = if i == selected { ">" } else { " " };
-            draw_text(
-                &format!("{} {}", marker, name),
-                40.0,
-                100.0 + i as f32 * 30.0,
-                25.0,
-                WHITE,
-            );
+            draw_text(&format!("{} {}", marker, name), 40.0, 100.0 + i as f32 * 30.0, 25.0, WHITE);
         }
-        draw_text("Enter to start | Esc to go back", 20.0, 400.0, 25.0, GREEN);
+        draw_text("Enter to start | Esc to go back", 20.0, 420.0, 25.0, GREEN);
 
-        if is_key_pressed(KeyCode::Up) {
-            selected = (selected + pattern_names.len() - 1) % pattern_names.len();
-        }
-        if is_key_pressed(KeyCode::Down) {
-            selected = (selected + 1) % pattern_names.len();
-        }
-        if is_key_pressed(KeyCode::Enter) {
-            break Some(selected);
-        }
-        if is_key_pressed(KeyCode::Escape) {
-            break None;
-        }
+        if is_key_pressed(KeyCode::Up) { selected = (selected + names.len() - 1) % names.len(); }
+        if is_key_pressed(KeyCode::Down) { selected = (selected + 1) % names.len(); }
+        if is_key_pressed(KeyCode::Enter) { break Some(selected); }
+        if is_key_pressed(KeyCode::Escape) { break None; }
         next_frame().await;
     }
 }
 
-async fn run_simulation(width: i32, height: i32, pattern: usize) {
-    let cell_size = 10;
-    let grid_width = width / cell_size;
-    let grid_height = height / cell_size;
-    let mut game = GameOfLife::new(grid_width, grid_height, cell_size);
+// ========== Simulation Loop ==========
+async fn run_simulation(screen_w: i32, screen_h: i32, pattern: usize) {
+    request_new_screen_size(screen_w as f32, screen_h as f32);
 
-    match pattern {
-        0 => game.add_glider(grid_width / 2, grid_height / 2),
-        1 => game.add_random(0.2),
-        2 => game.add_block(10, 10),
-        3 => game.add_blinker(grid_width / 2, grid_height / 2),
-        4 => game.add_beacon(10, 10),
-        5 => game.add_rpentomino(grid_width / 2, grid_height / 2),
-        6 => game.add_acorn(10, 10),
-        7 => game.add_diehard(10, 10),
-        8 => game.add_gosper_gun(1, 1),
-        9 => game.add_pentadecathlon(grid_width / 2 - 4, grid_height / 2),
-        _ => {}
-    }
+    let grid_w = screen_w / CELL_SIZE;
+    let grid_h = screen_h / CELL_SIZE;
+    let mut game = GameOfLife::new(grid_w, grid_h, CELL_SIZE);
+    game.seed(pattern);
+
+    let mut paused = false;
+    let mut speed: f32 = SPEED_INIT;
+    let mut acc = 0.0f32;
 
     loop {
-        game.next_generation();
+        let dt = get_frame_time();
+        acc += dt;
+
+        // ---- input ----
+        if is_key_pressed(KeyCode::Space) { paused = !paused; }
+        if is_key_pressed(KeyCode::N) && paused { game.next_generation(); }
+        if is_key_pressed(KeyCode::Minus) { speed = (speed - 1.0).max(SPEED_MIN); }
+        if is_key_pressed(KeyCode::Equal) { speed = (speed + 1.0).min(SPEED_MAX); }
+        if is_key_pressed(KeyCode::G) { game.show_grid = !game.show_grid; }
+        if is_key_pressed(KeyCode::W) { game.wrap_world = !game.wrap_world; }
+        if is_key_pressed(KeyCode::C) { game.clear(); }
+        if is_key_pressed(KeyCode::R) { game.clear(); game.random_fill(RANDOM_DENSITY); }
+        if is_key_pressed(KeyCode::Escape) { break; }
+
+        // draw/erase with mouse
+        if is_mouse_button_pressed(MouseButton::Left) || is_mouse_button_down(MouseButton::Left) {
+            let (mx, my) = mouse_position();
+            let gx = (mx / game.cell as f32) as i32;
+            let gy = (my / game.cell as f32) as i32;
+            game.toggle_cell(gx, gy);
+        }
+
+        // ---- update ----
+        if !paused {
+            let step = 1.0 / speed;
+            while acc >= step {
+                game.next_generation();
+                acc -= step;
+            }
+        }
+
+        // ---- render ----
         game.draw();
+        game.draw_hud(paused, speed);
         next_frame().await;
     }
 }
 
+// ========== Entry ==========
 #[macroquad::main("Conway's Game of Life")]
 async fn main() {
-    let sizes = [(640, 480), (800, 600), (1024, 768), (1920, 1080)];
-
+    let sizes = [(640, 480), (800, 600), (1024, 768), (1280, 720), (1920, 1080)];
     loop {
-        let size_index = choose_resolution(&sizes).await;
-        let (screen_width, screen_height) = sizes[size_index];
-
-        if let Some(pattern_index) = choose_pattern().await {
-            run_simulation(screen_width, screen_height, pattern_index).await;
-            break;
+        let idx = choose_resolution(&sizes).await;
+        let (w, h) = sizes[idx];
+        if let Some(pat) = choose_pattern().await {
+            run_simulation(w, h, pat).await; // Esc เพื่อย้อนกลับ
         }
-
-        // If user pressed Esc on pattern menu, go back to resolution menu
     }
 }
+
+// ========== Utils ==========
+#[inline]
+fn on_off(b: bool) -> &'static str { if b { "on" } else { "off" } }
