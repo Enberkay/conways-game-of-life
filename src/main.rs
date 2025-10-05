@@ -9,6 +9,73 @@ const SPEED_MIN: f32 = 1.0;
 const SPEED_MAX: f32 = 120.0;
 const SPEED_INIT: f32 = 10.0;
 
+// ========== Color Themes ==========
+#[derive(Clone, Copy, PartialEq, Eq, Default)]
+enum ColorTheme {
+    #[default]
+    Classic,  // Original green
+    Dark,     // Dark theme (white on black)
+    Pastel,   // Pastel theme
+    Neon,     // Neon theme
+}
+
+impl ColorTheme {
+    fn colors(&self) -> ThemeColors {
+        match self {
+            ColorTheme::Classic => ThemeColors {
+                background: BLACK,
+                cell: GREEN,
+                grid: Color::new(0.15, 0.15, 0.15, 1.0),
+                border: RED,
+                text: WHITE,
+                text_secondary: GRAY,
+            },
+            ColorTheme::Dark => ThemeColors {
+                background: BLACK,
+                cell: WHITE,
+                grid: Color::new(0.2, 0.2, 0.2, 1.0),
+                border: Color::new(0.8, 0.8, 0.8, 1.0),
+                text: WHITE,
+                text_secondary: Color::new(0.7, 0.7, 0.7, 1.0),
+            },
+            ColorTheme::Pastel => ThemeColors {
+                background: Color::new(0.95, 0.95, 0.98, 1.0),
+                cell: Color::new(0.8, 0.6, 0.9, 1.0),  // Light purple
+                grid: Color::new(0.85, 0.85, 0.85, 1.0),
+                border: Color::new(0.6, 0.4, 0.8, 1.0),
+                text: Color::new(0.2, 0.2, 0.3, 1.0),
+                text_secondary: Color::new(0.4, 0.4, 0.5, 1.0),
+            },
+            ColorTheme::Neon => ThemeColors {
+                background: Color::new(0.05, 0.05, 0.1, 1.0),  // Dark blue
+                cell: Color::new(0.0, 1.0, 0.8, 1.0),  // Neon green
+                grid: Color::new(0.2, 0.2, 0.4, 1.0),
+                border: Color::new(1.0, 0.0, 0.8, 1.0),  // Pink
+                text: Color::new(0.8, 1.0, 1.0, 1.0),
+                text_secondary: Color::new(0.6, 0.8, 1.0, 1.0),
+            },
+        }
+    }
+    
+    fn name(&self) -> &'static str {
+        match self {
+            ColorTheme::Classic => "Classic",
+            ColorTheme::Dark => "Dark",
+            ColorTheme::Pastel => "Pastel",
+            ColorTheme::Neon => "Neon",
+        }
+    }
+}
+
+struct ThemeColors {
+    background: Color,
+    cell: Color,
+    grid: Color,
+    border: Color,
+    text: Color,
+    text_secondary: Color,
+}
+
 // ========== Core Types ==========
 #[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
 struct Position(i32, i32);
@@ -20,7 +87,7 @@ impl Position {
     }
 }
 
-// เพื่อนบ้าน 8 ทิศ แบบคงที่ (ลดการสร้าง tuple ซ้ำ)
+// 8 neighbor offsets (constant to avoid tuple creation)
 const NEIGHBOR_OFFSETS: [(i32, i32); 8] = [
     (-1, -1), (0, -1), (1, -1),
     (-1,  0),          (1,  0),
@@ -37,6 +104,7 @@ struct GameOfLife {
     generation: u64,
     wrap_world: bool,
     show_grid: bool,
+    theme: ColorTheme,
 }
 
 impl GameOfLife {
@@ -49,6 +117,7 @@ impl GameOfLife {
             generation: 0,
             wrap_world: false,
             show_grid: true,
+            theme: ColorTheme::Classic,
         }
     }
 
@@ -92,11 +161,11 @@ impl GameOfLife {
         }
     }
 
-    /// อัปเดตรุ่นถัดไป: นับเพื่อนบ้านด้วย HashMap ครั้งเดียว -> ตัดสินกฎ
+    /// Next generation: count neighbors with HashMap once -> apply rules
     fn next_generation(&mut self) {
         let mut counts: HashMap<Position, u8> = HashMap::with_capacity(self.live.len() * 8 + 8);
 
-        // นับเพื่อนบ้านของทุก cell ที่มีชีวิต (แจกคะแนนให้ 8 ทิศ)
+        // Count neighbors of all live cells (distribute to 8 directions)
         for &cell in &self.live {
             for (dx, dy) in NEIGHBOR_OFFSETS {
                 let p = if self.wrap_world {
@@ -110,7 +179,7 @@ impl GameOfLife {
             }
         }
 
-        // สร้างชุดใหม่จาก count: 3 -> เกิดใหม่, 2 && เดิมมีชีวิต -> รอด
+        // Create new set from count: 3 -> birth, 2 && alive -> survive
         let mut next = HashSet::with_capacity(self.live.len());
         for (pos, n) in counts {
             let alive = self.live.contains(&pos);
@@ -125,7 +194,8 @@ impl GameOfLife {
 
     // ---------- Rendering ----------
     fn draw(&self) {
-        clear_background(BLACK);
+        let colors = self.theme.colors();
+        clear_background(colors.background);
 
         // cells
         for &Position(x, y) in &self.live {
@@ -134,25 +204,24 @@ impl GameOfLife {
                 (y * self.cell) as f32,
                 self.cell as f32,
                 self.cell as f32,
-                GREEN,
+                colors.cell,
             );
         }
 
         // grid
         if self.show_grid {
-            let color = Color::new(0.15, 0.15, 0.15, 1.0);
             for x in 0..=self.width {
                 draw_line(
                     (x * self.cell) as f32, 0.0,
                     (x * self.cell) as f32, (self.height * self.cell) as f32,
-                    1.0, color,
+                    1.0, colors.grid,
                 );
             }
             for y in 0..=self.height {
                 draw_line(
                     0.0, (y * self.cell) as f32,
                     (self.width * self.cell) as f32, (y * self.cell) as f32,
-                    1.0, color,
+                    1.0, colors.grid,
                 );
             }
         }
@@ -162,23 +231,25 @@ impl GameOfLife {
             0.0, 0.0,
             (self.width * self.cell) as f32,
             (self.height * self.cell) as f32,
-            3.0, RED,
+            3.0, colors.border,
         );
     }
 
     fn draw_hud(&self, paused: bool, speed: f32) {
+        let colors = self.theme.colors();
         let info = format!(
-            "Gen:{} | FPS:{:.0} | {} | speed:{:.1} gen/s | grid:{} | wrap:{}",
+            "Gen:{} | FPS:{:.0} | {} | speed:{:.1} gen/s | grid:{} | wrap:{} | Theme:{}",
             self.generation, get_fps() as f32,
             if paused { "PAUSED" } else { "RUN" },
             speed,
             on_off(self.show_grid),
             on_off(self.wrap_world),
+            self.theme.name(),
         );
-        draw_text(&info, 10.0, 22.0, 22.0, WHITE);
+        draw_text(&info, 10.0, 22.0, 22.0, colors.text);
 
-        let help = "Space: Pause | N: Step | -/=: Speed | R: Random | C: Clear | G: Grid | W: Wrap | Esc: Menu | LMB: Draw/Erase";
-        draw_text(help, 10.0, 46.0, 18.0, GRAY);
+        let help = "Space: Pause | N: Step | -/=: Speed | R: Random | C: Clear | G: Grid | W: Wrap | T: Theme | Esc: Menu | LMB: Draw/Erase";
+        draw_text(help, 10.0, 46.0, 18.0, colors.text_secondary);
     }
 
     // ---------- Patterns ----------
@@ -234,6 +305,16 @@ impl GameOfLife {
         for (dx,dy) in [(0,0),(1,0),(2,0),(3,0),(1,-1),(1,1),(4,-1),(4,1),(5,0),(6,0),(7,0),(8,0)] {
             self.add_cell(x+dx, y+dy);
         }
+    }
+    
+    // ---------- Theme Management ----------
+    fn cycle_theme(&mut self) {
+        self.theme = match self.theme {
+            ColorTheme::Classic => ColorTheme::Dark,
+            ColorTheme::Dark => ColorTheme::Pastel,
+            ColorTheme::Pastel => ColorTheme::Neon,
+            ColorTheme::Neon => ColorTheme::Classic,
+        };
     }
 }
 
@@ -305,6 +386,7 @@ async fn run_simulation(screen_w: i32, screen_h: i32, pattern: usize) {
         if is_key_pressed(KeyCode::Equal) { speed = (speed + 1.0).min(SPEED_MAX); }
         if is_key_pressed(KeyCode::G) { game.show_grid = !game.show_grid; }
         if is_key_pressed(KeyCode::W) { game.wrap_world = !game.wrap_world; }
+        if is_key_pressed(KeyCode::T) { game.cycle_theme(); }
         if is_key_pressed(KeyCode::C) { game.clear(); }
         if is_key_pressed(KeyCode::R) { game.clear(); game.random_fill(RANDOM_DENSITY); }
         if is_key_pressed(KeyCode::Escape) { break; }
@@ -341,7 +423,7 @@ async fn main() {
         let idx = choose_resolution(&sizes).await;
         let (w, h) = sizes[idx];
         if let Some(pat) = choose_pattern().await {
-            run_simulation(w, h, pat).await; // Esc เพื่อย้อนกลับ
+            run_simulation(w, h, pat).await; // Esc to go back
         }
     }
 }
