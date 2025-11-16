@@ -1,9 +1,9 @@
 use macroquad::prelude::*;
 
 use crate::config::SCREEN_SIZES;
-use crate::patterns::get_pattern_by_index;
+use crate::patterns::{get_pattern_by_index};
 
-/// Display the resolution selection menu and return the selected index
+/// Display screen resolution selection menu
 pub async fn choose_resolution() -> usize {
     let mut selected = 1usize;
     loop {
@@ -24,9 +24,9 @@ pub async fn choose_resolution() -> usize {
     selected
 }
 
-/// Display pattern selection menu and return the selected pattern index
+/// Display pattern selection menu
 pub async fn choose_pattern() -> Option<usize> {
-    const PATTERN_COUNT: usize = 10; // Number of patterns available
+    const PATTERN_COUNT: usize = 10; // Total number of available patterns
     let mut selected = 0usize;
     loop {
         clear_background(DARKBLUE);
@@ -46,20 +46,20 @@ pub async fn choose_pattern() -> Option<usize> {
     }
 }
 
-/// Run the main game simulation loop
+/// Run main game simulation loop
 pub async fn run_simulation(screen_w: i32, screen_h: i32, pattern_index: usize) {
     use crate::config::{CELL_SIZE, SPEED_INIT, SPEED_MAX, SPEED_MIN};
     use crate::game::GameOfLife;
     
     request_new_screen_size(screen_w as f32, screen_h as f32);
 
+    // Calculate grid dimensions based on screen size and cell size
     let grid_w = screen_w / CELL_SIZE;
     let grid_h = screen_h / CELL_SIZE;
     let mut game = GameOfLife::new(grid_w, grid_h, CELL_SIZE);
     
+    // Apply selected pattern at grid center
     let pattern = get_pattern_by_index(pattern_index);
-    
-    // Apply pattern at the center of the grid for all patterns
     let x = grid_w / 2;
     let y = grid_h / 2;
     game.apply_pattern(pattern.as_ref(), x, y);
@@ -69,10 +69,10 @@ pub async fn run_simulation(screen_w: i32, screen_h: i32, pattern_index: usize) 
     let mut acc = 0.0f32;
 
     loop {
-        let dt = get_frame_time();
+        let dt = get_frame_time(); // Time since last frame
         acc += dt;
 
-        // Handle input
+        // Process user input
         if is_key_pressed(KeyCode::Space) { paused = !paused; }
         if is_key_pressed(KeyCode::N) && paused { game.next_generation(); }
         if is_key_pressed(KeyCode::Minus) { speed = (speed - 1.0).max(SPEED_MIN); }
@@ -87,15 +87,15 @@ pub async fn run_simulation(screen_w: i32, screen_h: i32, pattern_index: usize) 
         }
         if is_key_pressed(KeyCode::Escape) { break; }
 
-        // Handle mouse input
+        // Process mouse interaction
         if is_mouse_button_pressed(MouseButton::Left) || is_mouse_button_down(MouseButton::Left) {
-            let (mx, my) = mouse_position();
-            let gx = (mx / game.cell as f32) as i32;
+            let (mx, my) = mouse_position(); // Get mouse coordinates
+            let gx = (mx / game.cell as f32) as i32; // Convert to grid coordinates
             let gy = (my / game.cell as f32) as i32;
-            game.toggle_cell(gx, gy);
+            game.toggle_cell(gx, gy); // Toggle cell at mouse position
         }
 
-        // Update simulation
+        // Update game state
         if !paused {
             let step = 1.0 / speed;
             while acc >= step {
@@ -104,7 +104,7 @@ pub async fn run_simulation(screen_w: i32, screen_h: i32, pattern_index: usize) 
             }
         }
 
-        // Render
+        // Draw everything
         game.draw();
         game.draw_hud(paused, speed);
         next_frame().await;

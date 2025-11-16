@@ -5,18 +5,18 @@ use crate::grid::{Grid, Position};
 use crate::patterns::{Pattern, PatternContext};
 use crate::themes::ColorTheme;
 
-/// Main game state for Conway's Game of Life
+/// Core game state for Conway's Game of Life simulation
 pub struct GameOfLife {
     pub live: HashSet<Position>,
     pub grid: Grid,
-    pub cell: i32,
-    pub generation: u64,
-    pub show_grid: bool,
-    pub theme: ColorTheme,
+    pub cell: i32,          // Visual size of each cell in pixels
+    pub generation: u64,     // Current generation count
+    pub show_grid: bool,     // Whether to draw grid lines
+    pub theme: ColorTheme,   // Current color theme
 }
 
 impl GameOfLife {
-    /// Create a new game with the specified dimensions
+    /// Create a new game grid with specified dimensions
     pub fn new(width: i32, height: i32, cell_size: i32) -> Self {
         Self {
             live: HashSet::new(),
@@ -28,7 +28,7 @@ impl GameOfLife {
         }
     }
 
-    /// Add a cell at the specified position
+    /// Add a live cell at the specified position
     pub fn add_cell(&mut self, x: i32, y: i32) {
         let p = if self.grid.wrap_world { self.grid.wrap(x, y) } else { Position(x, y) };
         if self.grid.wrap_world || self.grid.in_bounds(p.x(), p.y()) {
@@ -36,20 +36,20 @@ impl GameOfLife {
         }
     }
 
-    /// Toggle a cell at the specified position
+    /// Toggle a cell between alive and dead states
     pub fn toggle_cell(&mut self, x: i32, y: i32) {
         let p = if self.grid.wrap_world { self.grid.wrap(x, y) } else { Position(x, y) };
         if !(self.grid.wrap_world || self.grid.in_bounds(p.x(), p.y())) { return; }
         if !self.live.remove(&p) { self.live.insert(p); }
     }
 
-    /// Clear all cells and reset generation counter
+    /// Remove all cells and reset generation count to zero
     pub fn clear(&mut self) {
         self.live.clear();
         self.generation = 0;
     }
 
-    /// Fill the grid randomly with cells
+    /// Randomly distribute cells across the grid
     pub fn random_fill(&mut self, density: f32) {
         use macroquad::rand::gen_range;
         for y in 0..self.grid.height {
@@ -67,7 +67,7 @@ impl GameOfLife {
         self.generation += 1;
     }
 
-    /// Apply a pattern to the game
+    /// Apply a pattern at the specified position
     pub fn apply_pattern(&mut self, pattern: &dyn Pattern, x: i32, y: i32) {
         let mut ctx = PatternContext {
             cells: &mut self.live,
@@ -79,7 +79,7 @@ impl GameOfLife {
         pattern.apply(&mut ctx, x, y);
     }
 
-    /// Cycle to the next color theme
+    /// Switch to the next available color theme
     pub fn cycle_theme(&mut self) {
         self.theme = match self.theme {
             ColorTheme::Classic => ColorTheme::Dark,
@@ -89,12 +89,12 @@ impl GameOfLife {
         };
     }
 
-    /// Render the game
+    /// Draw the current game state to screen
     pub fn draw(&self) {
         let colors = self.theme.colors();
         clear_background(colors.background);
 
-        // Draw live cells
+        // Draw all living cells
         for &Position(x, y) in &self.live {
             draw_rectangle(
                 (x * self.cell) as f32,
@@ -105,7 +105,7 @@ impl GameOfLife {
             );
         }
 
-        // Draw grid lines
+        // Draw grid lines if enabled
         if self.show_grid {
             for x in 0..=self.grid.width {
                 draw_line(
@@ -123,7 +123,7 @@ impl GameOfLife {
             }
         }
 
-        // Draw border
+        // Draw game border
         draw_rectangle_lines(
             0.0, 0.0,
             (self.grid.width * self.cell) as f32,
@@ -132,9 +132,10 @@ impl GameOfLife {
         );
     }
 
-    /// Draw the HUD overlay
+    /// Draw heads-up display with game information
     pub fn draw_hud(&self, paused: bool, speed: f32) {
         let colors = self.theme.colors();
+        // Display game statistics and controls
         let info = format!(
             "Gen:{} | FPS:{:.0} | {} | speed:{:.1} gen/s | grid:{} | wrap:{} | Theme:{}",
             self.generation, get_fps() as f32,
@@ -146,7 +147,7 @@ impl GameOfLife {
         );
         draw_text(&info, 10.0, 22.0, 22.0, colors.text);
 
-        let help = "Space: Pause | N: Step | -/=: Speed | R: Random | C: Clear | G: Grid | W: Wrap | T: Theme | Esc: Menu | LMB: Draw/Erase";
+        let help = "Controls: Space:Pause | N:Step | -/=:Speed | R:Random | C:Clear | G:Grid | W:Wrap | T:Theme | Esc:Menu | Mouse:Draw/Erase";
         draw_text(help, 10.0, 46.0, 18.0, colors.text_secondary);
     }
 }

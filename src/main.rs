@@ -10,16 +10,17 @@ mod ui;
 use config::SCREEN_SIZES;
 use ui::{choose_resolution, choose_pattern, run_simulation};
 
+/// Main entry point for Conway's Game of Life
 #[macroquad::main("Conway's Game of Life")]
 async fn main() {
     loop {
-        // Let user select screen resolution
+        // Get user screen resolution selection
         let idx = choose_resolution().await;
         let (w, h) = SCREEN_SIZES[idx];
         
-        // Let user select a pattern
+        // Get user pattern selection
         if let Some(pat) = choose_pattern().await {
-            // Run the simulation with the selected pattern
+            // Start simulation with selected options
             run_simulation(w, h, pat).await;
         }
     }

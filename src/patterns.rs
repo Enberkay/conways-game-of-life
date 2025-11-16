@@ -3,7 +3,7 @@ use crate::grid::Position;
 use crate::config::RANDOM_DENSITY;
 use macroquad::rand::gen_range;
 
-/// Context object for pattern application
+/// Context for pattern application with grid information
 pub struct PatternContext<'a> {
     pub cells: &'a mut HashSet<Position>,
     pub grid_width: i32,
@@ -12,10 +12,10 @@ pub struct PatternContext<'a> {
 }
 
 impl<'a> PatternContext<'a> {
-    /// Add a cell at the specified position with proper wrapping
+    /// Add a cell with edge wrapping if enabled
     pub fn add_cell(&mut self, x: i32, y: i32) {
         let p = if self.wrap_world { 
-            // Use same wrapping logic as Grid to avoid duplication
+            // Wrap coordinates around edges
             let mut nx = x % self.grid_width;
             let mut ny = y % self.grid_height;
             if nx < 0 { nx += self.grid_width; }
@@ -40,7 +40,7 @@ pub trait Pattern {
     fn apply(&self, ctx: &mut PatternContext, x: i32, y: i32);
 }
 
-/// Pattern for a glider that moves diagonally
+/// A glider that moves diagonally across the grid
 pub struct GliderPattern;
 
 impl Pattern for GliderPattern {
@@ -55,7 +55,7 @@ impl Pattern for GliderPattern {
     }
 }
 
-/// Pattern for randomly placing cells
+/// Randomly distributes cells across the grid
 pub struct RandomPattern {
     pub density: f32,
 }
@@ -82,7 +82,7 @@ impl Pattern for RandomPattern {
     }
 }
 
-/// Pattern for a 2x2 block (still life)
+/// A stable 2x2 block pattern (still life)
 pub struct BlockPattern;
 
 impl Pattern for BlockPattern {
@@ -99,7 +99,7 @@ impl Pattern for BlockPattern {
     }
 }
 
-/// Pattern for a blinker (oscillator with period 2)
+/// A 3-cell line that oscillates with period 2
 pub struct BlinkerPattern;
 
 impl Pattern for BlinkerPattern {
@@ -114,7 +114,7 @@ impl Pattern for BlinkerPattern {
     }
 }
 
-/// Pattern for a beacon (oscillator with period 2)
+/// Two 2x2 blocks that alternate flashing (oscillator)
 pub struct BeaconPattern;
 
 impl Pattern for BeaconPattern {
@@ -129,7 +129,7 @@ impl Pattern for BeaconPattern {
     }
 }
 
-/// Pattern for R-pentomino (chaotic pattern that lasts a long time)
+/// A 5-cell pattern that evolves chaotically for many generations
 pub struct RPentominoPattern;
 
 impl Pattern for RPentominoPattern {
@@ -144,7 +144,7 @@ impl Pattern for RPentominoPattern {
     }
 }
 
-/// Pattern for Acorn (long-lived pattern)
+/// A 7-cell sparse pattern that grows into a large field
 pub struct AcornPattern;
 
 impl Pattern for AcornPattern {
@@ -159,7 +159,7 @@ impl Pattern for AcornPattern {
     }
 }
 
-/// Pattern for Diehard (dies after 130 generations)
+/// A 7-cell pattern that disappears after exactly 130 generations
 pub struct DiehardPattern;
 
 impl Pattern for DiehardPattern {
@@ -174,7 +174,7 @@ impl Pattern for DiehardPattern {
     }
 }
 
-/// Pattern for Gosper Glider Gun (periodically emits gliders)
+/// First discovered pattern that creates gliders indefinitely
 pub struct GosperGunPattern;
 
 impl Pattern for GosperGunPattern {
@@ -195,7 +195,7 @@ impl Pattern for GosperGunPattern {
     }
 }
 
-/// Pattern for Pentadecathlon (oscillator with period 15)
+/// A long oscillator with period 15 generations
 pub struct PentadecathlonPattern;
 
 impl Pattern for PentadecathlonPattern {
@@ -210,7 +210,7 @@ impl Pattern for PentadecathlonPattern {
     }
 }
 
-/// Get a pattern by index for menu selection
+/// Get pattern instance by index for menu selection
 pub fn get_pattern_by_index(index: usize) -> Box<dyn Pattern> {
     match index {
         0 => Box::new(GliderPattern),

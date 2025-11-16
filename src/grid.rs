@@ -1,6 +1,6 @@
 use std::collections::{HashMap, HashSet};
 
-// Position represents a cell coordinate in the grid
+/// A cell coordinate in the grid
 #[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
 pub struct Position(pub i32, pub i32);
 
@@ -23,18 +23,18 @@ impl Position {
     }
 }
 
-// 8 neighbor offsets (constant to avoid tuple creation)
+/// 8 neighboring cell offsets (pre-computed to avoid repeated creation)
 pub const NEIGHBOR_OFFSETS: [(i32, i32); 8] = [
     (-1, -1), (0, -1), (1, -1),
     (-1,  0),          (1,  0),
     (-1,  1), (0,  1), (1,  1),
 ];
 
-// Grid utilities for the Game of Life simulation
+/// Grid properties and utilities for Game of Life simulation
 pub struct Grid {
-    pub width: i32,
-    pub height: i32,
-    pub wrap_world: bool,
+    pub width: i32,         // Grid width in cells
+    pub height: i32,        // Grid height in cells
+    pub wrap_world: bool,    // Whether cells wrap around edges
 }
 
 impl Grid {
@@ -60,12 +60,11 @@ impl Grid {
         Position::new(nx, ny)
     }
 
-    /// Calculate next generation based on current live cells
-    /// Count neighbors with HashMap once -> apply rules
+    /// Calculate next generation of cells
     pub fn next_generation(&self, live: &HashSet<Position>) -> HashSet<Position> {
         let mut counts: HashMap<Position, u8> = HashMap::with_capacity(live.len() * 8 + 8);
 
-        // Count neighbors of all live cells (distribute to 8 directions)
+        // Count neighbors for each live cell
         for &cell in live {
             for (dx, dy) in NEIGHBOR_OFFSETS {
                 let p = if self.wrap_world {
@@ -79,7 +78,9 @@ impl Grid {
             }
         }
 
-        // Create new set from count: 3 -> birth, 2 && alive -> survive
+        // Apply Game of Life rules:
+        // - Birth: dead cell with exactly 3 neighbors
+        // - Survival: live cell with 2 or 3 neighbors
         let mut next = HashSet::with_capacity(live.len());
         for (pos, n) in counts {
             let alive = live.contains(&pos);

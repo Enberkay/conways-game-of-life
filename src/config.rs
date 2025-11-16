@@ -1,11 +1,11 @@
 // Game configuration constants
-pub const CELL_SIZE: i32 = 10;
-pub const RANDOM_DENSITY: f32 = 0.20;
-pub const SPEED_MIN: f32 = 1.0;
-pub const SPEED_MAX: f32 = 120.0;
-pub const SPEED_INIT: f32 = 10.0;
+pub const CELL_SIZE: i32 = 10;          // Pixel size of each cell
+pub const RANDOM_DENSITY: f32 = 0.20;     // Density for random patterns
+pub const SPEED_MIN: f32 = 1.0;           // Minimum generations per second
+pub const SPEED_MAX: f32 = 120.0;         // Maximum generations per second
+pub const SPEED_INIT: f32 = 10.0;         // Default generations per second
 
-// Screen resolution options
+// Available screen resolutions (width, height)
 pub const SCREEN_SIZES: [(i32, i32); 5] = [
     (640, 480),
     (800, 600),
