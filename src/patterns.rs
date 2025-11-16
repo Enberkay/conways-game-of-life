@@ -1,3 +1,4 @@
+use std::collections::HashSet;
 use crate::grid::Position;
 use macroquad::rand::gen_range;
 

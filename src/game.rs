@@ -1,10 +1,9 @@
 use std::collections::HashSet;
 use macroquad::prelude::*;
 
-use crate::config::{CELL_SIZE, RANDOM_DENSITY};
 use crate::grid::{Grid, Position};
 use crate::patterns::Pattern;
-use crate::themes::{ColorTheme, ThemeColors};
+use crate::themes::ColorTheme;
 
 /// Main game state for Conway's Game of Life
 pub struct GameOfLife {
