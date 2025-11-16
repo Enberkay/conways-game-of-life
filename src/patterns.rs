@@ -1,5 +1,4 @@
 use crate::grid::Position;
-use crate::game::GameOfLife;
 use macroquad::rand::gen_range;
 
 /// Pattern trait for all Conway's Game of Life patterns
@@ -7,8 +6,26 @@ pub trait Pattern {
     /// Returns the name of the pattern
     fn name(&self) -> &'static str;
     
-    /// Applies the pattern to the game at the specified position
-    fn apply(&self, game: &mut GameOfLife, x: i32, y: i32);
+    /// Applies the pattern to the game state
+    fn apply(&self, cells: &mut HashSet<Position>, grid_width: i32, grid_height: i32, wrap_world: bool, x: i32, y: i32);
+    
+    /// Apply pattern with default cell addition logic
+    fn add_cell_to_pattern(&self, cells: &mut HashSet<Position>, grid_width: i32, grid_height: i32, wrap_world: bool, x: i32, y: i32) {
+        let p = if wrap_world { 
+            // Wrap coordinates
+            let mut nx = x % grid_width;
+            let mut ny = y % grid_height;
+            if nx < 0 { nx += grid_width; }
+            if ny < 0 { ny += grid_height; }
+            Position(nx, ny)
+        } else { 
+            Position(x, y) 
+        };
+        
+        if wrap_world || ((0..grid_width).contains(&x) && (0..grid_height).contains(&y)) {
+            cells.insert(p);
+        }
+    }
 }
 
 /// Pattern for a glider that moves diagonally
@@ -19,9 +36,9 @@ impl Pattern for GliderPattern {
         "Glider"
     }
     
-    fn apply(&self, game: &mut GameOfLife, x: i32, y: i32) {
+    fn apply(&self, cells: &mut HashSet<Position>, grid_width: i32, grid_height: i32, wrap_world: bool, x: i32, y: i32) {
         for (dx, dy) in [(1,0),(2,1),(0,2),(1,2),(2,2)] { 
-            game.add_cell(x+dx, y+dy); 
+            self.add_cell_to_pattern(cells, grid_width, grid_height, wrap_world, x+dx, y+dy); 
         }
     }
 }
@@ -42,11 +59,11 @@ impl Pattern for RandomPattern {
         "Random"
     }
     
-    fn apply(&self, game: &mut GameOfLife, _x: i32, _y: i32) {
-        for y in 0..game.grid.height {
-            for x in 0..game.grid.width {
+    fn apply(&self, cells: &mut HashSet<Position>, grid_width: i32, grid_height: i32, wrap_world: bool, _x: i32, _y: i32) {
+        for y in 0..grid_height {
+            for x in 0..grid_width {
                 if gen_range(0.0, 1.0) < self.density {
-                    game.add_cell(x, y);
+                    self.add_cell_to_pattern(cells, grid_width, grid_height, wrap_world, x, y);
                 }
             }
         }
@@ -61,10 +78,10 @@ impl Pattern for BlockPattern {
         "Block"
     }
     
-    fn apply(&self, game: &mut GameOfLife, x: i32, y: i32) {
+    fn apply(&self, cells: &mut HashSet<Position>, grid_width: i32, grid_height: i32, wrap_world: bool, x: i32, y: i32) {
         for dx in 0..2 { 
             for dy in 0..2 { 
-                game.add_cell(x+dx, y+dy); 
+                self.add_cell_to_pattern(cells, grid_width, grid_height, wrap_world, x+dx, y+dy); 
             } 
         }
     }
@@ -78,9 +95,9 @@ impl Pattern for BlinkerPattern {
         "Blinker"
     }
     
-    fn apply(&self, game: &mut GameOfLife, x: i32, y: i32) {
+    fn apply(&self, cells: &mut HashSet<Position>, grid_width: i32, grid_height: i32, wrap_world: bool, x: i32, y: i32) {
         for dx in 0..3 { 
-            game.add_cell(x+dx, y); 
+            self.add_cell_to_pattern(cells, grid_width, grid_height, wrap_world, x+dx, y); 
         }
     }
 }
@@ -93,9 +110,9 @@ impl Pattern for BeaconPattern {
         "Beacon"
     }
     
-    fn apply(&self, game: &mut GameOfLife, x: i32, y: i32) {
+    fn apply(&self, cells: &mut HashSet<Position>, grid_width: i32, grid_height: i32, wrap_world: bool, x: i32, y: i32) {
         for (dx,dy) in [(0,0),(1,0),(0,1),(2,3),(3,2),(3,3)] { 
-            game.add_cell(x+dx, y+dy); 
+            self.add_cell_to_pattern(cells, grid_width, grid_height, wrap_world, x+dx, y+dy); 
         }
     }
 }
@@ -108,9 +125,9 @@ impl Pattern for RPentominoPattern {
         "R-pentomino"
     }
     
-    fn apply(&self, game: &mut GameOfLife, x: i32, y: i32) {
+    fn apply(&self, cells: &mut HashSet<Position>, grid_width: i32, grid_height: i32, wrap_world: bool, x: i32, y: i32) {
         for (dx,dy) in [(1,0),(2,0),(0,1),(1,1),(1,2)] { 
-            game.add_cell(x+dx, y+dy); 
+            self.add_cell_to_pattern(cells, grid_width, grid_height, wrap_world, x+dx, y+dy); 
         }
     }
 }
@@ -123,9 +140,9 @@ impl Pattern for AcornPattern {
         "Acorn"
     }
     
-    fn apply(&self, game: &mut GameOfLife, x: i32, y: i32) {
+    fn apply(&self, cells: &mut HashSet<Position>, grid_width: i32, grid_height: i32, wrap_world: bool, x: i32, y: i32) {
         for (dx,dy) in [(1,0),(3,1),(0,2),(1,2),(4,2),(5,2),(6,2)] { 
-            game.add_cell(x+dx, y+dy); 
+            self.add_cell_to_pattern(cells, grid_width, grid_height, wrap_world, x+dx, y+dy); 
         }
     }
 }
@@ -138,9 +155,9 @@ impl Pattern for DiehardPattern {
         "Diehard"
     }
     
-    fn apply(&self, game: &mut GameOfLife, x: i32, y: i32) {
+    fn apply(&self, cells: &mut HashSet<Position>, grid_width: i32, grid_height: i32, wrap_world: bool, x: i32, y: i32) {
         for (dx,dy) in [(6,0),(0,1),(1,1),(1,2),(5,2),(6,2),(7,2)] { 
-            game.add_cell(x+dx, y+dy); 
+            self.add_cell_to_pattern(cells, grid_width, grid_height, wrap_world, x+dx, y+dy); 
         }
     }
 }
@@ -153,7 +170,7 @@ impl Pattern for GosperGunPattern {
         "Gosper Gun"
     }
     
-    fn apply(&self, game: &mut GameOfLife, x: i32, y: i32) {
+    fn apply(&self, cells: &mut HashSet<Position>, grid_width: i32, grid_height: i32, wrap_world: bool, x: i32, y: i32) {
         let pts = [
             (24,0),(22,1),(24,1),(12,2),(13,2),(20,2),(21,2),(34,2),(35,2),
             (11,3),(15,3),(20,3),(21,3),(34,3),(35,3),(0,4),(1,4),(10,4),(16,4),
@@ -161,7 +178,7 @@ impl Pattern for GosperGunPattern {
             (10,6),(16,6),(24,6),(11,7),(15,7),(12,8),(13,8),
         ];
         for (dx,dy) in pts { 
-            game.add_cell(x+dx, y+dy); 
+            self.add_cell_to_pattern(cells, grid_width, grid_height, wrap_world, x+dx, y+dy); 
         }
     }
 }
@@ -174,9 +191,9 @@ impl Pattern for PentadecathlonPattern {
         "Pentadecathlon"
     }
     
-    fn apply(&self, game: &mut GameOfLife, x: i32, y: i32) {
+    fn apply(&self, cells: &mut HashSet<Position>, grid_width: i32, grid_height: i32, wrap_world: bool, x: i32, y: i32) {
         for (dx,dy) in [(0,0),(1,0),(2,0),(3,0),(1,-1),(1,1),(4,-1),(4,1),(5,0),(6,0),(7,0),(8,0)] {
-            game.add_cell(x+dx, y+dy);
+            self.add_cell_to_pattern(cells, grid_width, grid_height, wrap_world, x+dx, y+dy);
         }
     }
 }

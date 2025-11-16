@@ -70,7 +70,14 @@ impl GameOfLife {
 
     /// Apply a pattern to the game
     pub fn apply_pattern(&mut self, pattern: &dyn Pattern, x: i32, y: i32) {
-        pattern.apply(self, x, y);
+        pattern.apply(
+            &mut self.live, 
+            self.grid.width, 
+            self.grid.height, 
+            self.grid.wrap_world, 
+            x, 
+            y
+        );
     }
 
     /// Cycle to the next color theme

@@ -57,15 +57,11 @@ pub async fn run_simulation(screen_w: i32, screen_h: i32, pattern_index: usize) 
     let mut game = GameOfLife::new(grid_w, grid_h, CELL_SIZE);
     
     let pattern = get_pattern_by_index(pattern_index);
-    let position = (
-        if pattern_index == 1 { None } else { Some(grid_w / 2) }, // Center for non-random patterns
-        if pattern_index == 1 { None } else { Some(grid_h / 2) }
-    );
     
-    match position {
-        (Some(x), Some(y)) => game.apply_pattern(pattern.as_ref(), x, y),
-        _ => game.apply_pattern(pattern.as_ref(), 0, 0), // For random pattern
-    }
+    // Apply pattern at the center of the grid for all patterns
+    let x = grid_w / 2;
+    let y = grid_h / 2;
+    game.apply_pattern(pattern.as_ref(), x, y);
 
     let mut paused = false;
     let mut speed: f32 = SPEED_INIT;
