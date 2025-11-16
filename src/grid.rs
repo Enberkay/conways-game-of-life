@@ -5,10 +5,7 @@ use std::collections::{HashMap, HashSet};
 pub struct Position(pub i32, pub i32);
 
 impl Position {
-    #[inline]
-    pub fn offset(self, dx: i32, dy: i32) -> Self {
-        Position(self.0 + dx, self.1 + dy)
-    }
+
 
     #[inline]
     pub fn new(x: i32, y: i32) -> Self {
@@ -60,7 +57,7 @@ impl Grid {
         let mut ny = y % self.height;
         if nx < 0 { nx += self.width; }
         if ny < 0 { ny += self.height; }
-        Position(nx, ny)
+        Position::new(nx, ny)
     }
 
     /// Calculate next generation based on current live cells
@@ -72,11 +69,11 @@ impl Grid {
         for &cell in live {
             for (dx, dy) in NEIGHBOR_OFFSETS {
                 let p = if self.wrap_world {
-                    self.wrap(cell.0 + dx, cell.1 + dy)
+                    self.wrap(cell.x() + dx, cell.y() + dy)
                 } else {
-                    cell.offset(dx, dy)
+                    Position::new(cell.x() + dx, cell.y() + dy)
                 };
-                if self.wrap_world || self.in_bounds(p.0, p.1) {
+                if self.wrap_world || self.in_bounds(p.x(), p.y()) {
                     *counts.entry(p).or_insert(0) += 1;
                 }
             }

@@ -31,9 +31,10 @@ pub async fn choose_pattern() -> Option<usize> {
     loop {
         clear_background(DARKBLUE);
         draw_text("Select pattern:", 20.0, 50.0, 30.0, WHITE);
-        for (i, name) in names.iter().enumerate() {
+        for (i, _name) in names.iter().enumerate() {
+            let pattern = get_pattern_by_index(i);
             let marker = if i == selected { ">" } else { " " };
-            draw_text(&format!("{} {}", marker, name), 40.0, 100.0 + i as f32 * 30.0, 25.0, WHITE);
+            draw_text(&format!("{} {}", marker, pattern.name()), 40.0, 100.0 + i as f32 * 30.0, 25.0, WHITE);
         }
         draw_text("Enter to start | Esc to go back", 20.0, 420.0, 25.0, GREEN);
 
