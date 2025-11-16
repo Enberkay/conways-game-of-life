@@ -2,7 +2,7 @@ use std::collections::HashSet;
 use macroquad::prelude::*;
 
 use crate::grid::{Grid, Position};
-use crate::patterns::Pattern;
+use crate::patterns::{Pattern, PatternContext};
 use crate::themes::ColorTheme;
 
 /// Main game state for Conway's Game of Life
@@ -69,14 +69,14 @@ impl GameOfLife {
 
     /// Apply a pattern to the game
     pub fn apply_pattern(&mut self, pattern: &dyn Pattern, x: i32, y: i32) {
-        pattern.apply(
-            &mut self.live, 
-            self.grid.width, 
-            self.grid.height, 
-            self.grid.wrap_world, 
-            x, 
-            y
-        );
+        let mut ctx = PatternContext {
+            cells: &mut self.live,
+            grid_width: self.grid.width,
+            grid_height: self.grid.height,
+            wrap_world: self.grid.wrap_world,
+        };
+        
+        pattern.apply(&mut ctx, x, y);
     }
 
     /// Cycle to the next color theme

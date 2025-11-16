@@ -1,7 +1,7 @@
 use macroquad::prelude::*;
 
 use crate::config::SCREEN_SIZES;
-use crate::patterns::{get_pattern_names, get_pattern_by_index};
+use crate::patterns::get_pattern_by_index;
 
 /// Display the resolution selection menu and return the selected index
 pub async fn choose_resolution() -> usize {
@@ -24,22 +24,22 @@ pub async fn choose_resolution() -> usize {
     selected
 }
 
-/// Display the pattern selection menu and return the selected pattern index
+/// Display pattern selection menu and return the selected pattern index
 pub async fn choose_pattern() -> Option<usize> {
-    let names = get_pattern_names();
+    const PATTERN_COUNT: usize = 10; // Number of patterns available
     let mut selected = 0usize;
     loop {
         clear_background(DARKBLUE);
         draw_text("Select pattern:", 20.0, 50.0, 30.0, WHITE);
-        for (i, _name) in names.iter().enumerate() {
+        for i in 0..PATTERN_COUNT {
             let pattern = get_pattern_by_index(i);
             let marker = if i == selected { ">" } else { " " };
             draw_text(&format!("{} {}", marker, pattern.name()), 40.0, 100.0 + i as f32 * 30.0, 25.0, WHITE);
         }
         draw_text("Enter to start | Esc to go back", 20.0, 420.0, 25.0, GREEN);
 
-        if is_key_pressed(KeyCode::Up) { selected = (selected + names.len() - 1) % names.len(); }
-        if is_key_pressed(KeyCode::Down) { selected = (selected + 1) % names.len(); }
+        if is_key_pressed(KeyCode::Up) { selected = (selected + PATTERN_COUNT - 1) % PATTERN_COUNT; }
+        if is_key_pressed(KeyCode::Down) { selected = (selected + 1) % PATTERN_COUNT; }
         if is_key_pressed(KeyCode::Enter) { break Some(selected); }
         if is_key_pressed(KeyCode::Escape) { break None; }
         next_frame().await;
@@ -81,7 +81,10 @@ pub async fn run_simulation(screen_w: i32, screen_h: i32, pattern_index: usize) 
         if is_key_pressed(KeyCode::W) { game.grid.wrap_world = !game.grid.wrap_world; }
         if is_key_pressed(KeyCode::T) { game.cycle_theme(); }
         if is_key_pressed(KeyCode::C) { game.clear(); }
-        if is_key_pressed(KeyCode::R) { game.clear(); game.random_fill(0.2); }
+        if is_key_pressed(KeyCode::R) { 
+            game.clear(); 
+            game.random_fill(crate::config::RANDOM_DENSITY); 
+        }
         if is_key_pressed(KeyCode::Escape) { break; }
 
         // Handle mouse input

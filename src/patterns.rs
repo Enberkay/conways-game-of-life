@@ -1,6 +1,35 @@
 use std::collections::HashSet;
 use crate::grid::Position;
+use crate::config::RANDOM_DENSITY;
 use macroquad::rand::gen_range;
+
+/// Context object for pattern application
+pub struct PatternContext<'a> {
+    pub cells: &'a mut HashSet<Position>,
+    pub grid_width: i32,
+    pub grid_height: i32,
+    pub wrap_world: bool,
+}
+
+impl<'a> PatternContext<'a> {
+    /// Add a cell at the specified position with proper wrapping
+    pub fn add_cell(&mut self, x: i32, y: i32) {
+        let p = if self.wrap_world { 
+            // Use same wrapping logic as Grid to avoid duplication
+            let mut nx = x % self.grid_width;
+            let mut ny = y % self.grid_height;
+            if nx < 0 { nx += self.grid_width; }
+            if ny < 0 { ny += self.grid_height; }
+            Position::new(nx, ny)
+        } else { 
+            Position::new(x, y) 
+        };
+        
+        if self.wrap_world || ((0..self.grid_width).contains(&x) && (0..self.grid_height).contains(&y)) {
+            self.cells.insert(p);
+        }
+    }
+}
 
 /// Pattern trait for all Conway's Game of Life patterns
 pub trait Pattern {
@@ -8,25 +37,7 @@ pub trait Pattern {
     fn name(&self) -> &'static str;
     
     /// Applies the pattern to the game state
-    fn apply(&self, cells: &mut HashSet<Position>, grid_width: i32, grid_height: i32, wrap_world: bool, x: i32, y: i32);
-    
-    /// Apply pattern with default cell addition logic
-    fn add_cell_to_pattern(&self, cells: &mut HashSet<Position>, grid_width: i32, grid_height: i32, wrap_world: bool, x: i32, y: i32) {
-        let p = if wrap_world { 
-            // Wrap coordinates
-            let mut nx = x % grid_width;
-            let mut ny = y % grid_height;
-            if nx < 0 { nx += grid_width; }
-            if ny < 0 { ny += grid_height; }
-            Position(nx, ny)
-        } else { 
-            Position(x, y) 
-        };
-        
-        if wrap_world || ((0..grid_width).contains(&x) && (0..grid_height).contains(&y)) {
-            cells.insert(p);
-        }
-    }
+    fn apply(&self, ctx: &mut PatternContext, x: i32, y: i32);
 }
 
 /// Pattern for a glider that moves diagonally
@@ -37,9 +48,9 @@ impl Pattern for GliderPattern {
         "Glider"
     }
     
-    fn apply(&self, cells: &mut HashSet<Position>, grid_width: i32, grid_height: i32, wrap_world: bool, x: i32, y: i32) {
+    fn apply(&self, ctx: &mut PatternContext, x: i32, y: i32) {
         for (dx, dy) in [(1,0),(2,1),(0,2),(1,2),(2,2)] { 
-            self.add_cell_to_pattern(cells, grid_width, grid_height, wrap_world, x+dx, y+dy); 
+            ctx.add_cell(x+dx, y+dy); 
         }
     }
 }
@@ -60,11 +71,11 @@ impl Pattern for RandomPattern {
         "Random"
     }
     
-    fn apply(&self, cells: &mut HashSet<Position>, grid_width: i32, grid_height: i32, wrap_world: bool, _x: i32, _y: i32) {
-        for y in 0..grid_height {
-            for x in 0..grid_width {
+    fn apply(&self, ctx: &mut PatternContext, _x: i32, _y: i32) {
+        for y in 0..ctx.grid_height {
+            for x in 0..ctx.grid_width {
                 if gen_range(0.0, 1.0) < self.density {
-                    self.add_cell_to_pattern(cells, grid_width, grid_height, wrap_world, x, y);
+                    ctx.add_cell(x, y);
                 }
             }
         }
@@ -79,10 +90,10 @@ impl Pattern for BlockPattern {
         "Block"
     }
     
-    fn apply(&self, cells: &mut HashSet<Position>, grid_width: i32, grid_height: i32, wrap_world: bool, x: i32, y: i32) {
+    fn apply(&self, ctx: &mut PatternContext, x: i32, y: i32) {
         for dx in 0..2 { 
             for dy in 0..2 { 
-                self.add_cell_to_pattern(cells, grid_width, grid_height, wrap_world, x+dx, y+dy); 
+                ctx.add_cell(x+dx, y+dy); 
             } 
         }
     }
@@ -96,9 +107,9 @@ impl Pattern for BlinkerPattern {
         "Blinker"
     }
     
-    fn apply(&self, cells: &mut HashSet<Position>, grid_width: i32, grid_height: i32, wrap_world: bool, x: i32, y: i32) {
+    fn apply(&self, ctx: &mut PatternContext, x: i32, y: i32) {
         for dx in 0..3 { 
-            self.add_cell_to_pattern(cells, grid_width, grid_height, wrap_world, x+dx, y); 
+            ctx.add_cell(x+dx, y); 
         }
     }
 }
@@ -111,9 +122,9 @@ impl Pattern for BeaconPattern {
         "Beacon"
     }
     
-    fn apply(&self, cells: &mut HashSet<Position>, grid_width: i32, grid_height: i32, wrap_world: bool, x: i32, y: i32) {
+    fn apply(&self, ctx: &mut PatternContext, x: i32, y: i32) {
         for (dx,dy) in [(0,0),(1,0),(0,1),(2,3),(3,2),(3,3)] { 
-            self.add_cell_to_pattern(cells, grid_width, grid_height, wrap_world, x+dx, y+dy); 
+            ctx.add_cell(x+dx, y+dy); 
         }
     }
 }
@@ -126,9 +137,9 @@ impl Pattern for RPentominoPattern {
         "R-pentomino"
     }
     
-    fn apply(&self, cells: &mut HashSet<Position>, grid_width: i32, grid_height: i32, wrap_world: bool, x: i32, y: i32) {
+    fn apply(&self, ctx: &mut PatternContext, x: i32, y: i32) {
         for (dx,dy) in [(1,0),(2,0),(0,1),(1,1),(1,2)] { 
-            self.add_cell_to_pattern(cells, grid_width, grid_height, wrap_world, x+dx, y+dy); 
+            ctx.add_cell(x+dx, y+dy); 
         }
     }
 }
@@ -141,9 +152,9 @@ impl Pattern for AcornPattern {
         "Acorn"
     }
     
-    fn apply(&self, cells: &mut HashSet<Position>, grid_width: i32, grid_height: i32, wrap_world: bool, x: i32, y: i32) {
+    fn apply(&self, ctx: &mut PatternContext, x: i32, y: i32) {
         for (dx,dy) in [(1,0),(3,1),(0,2),(1,2),(4,2),(5,2),(6,2)] { 
-            self.add_cell_to_pattern(cells, grid_width, grid_height, wrap_world, x+dx, y+dy); 
+            ctx.add_cell(x+dx, y+dy); 
         }
     }
 }
@@ -156,9 +167,9 @@ impl Pattern for DiehardPattern {
         "Diehard"
     }
     
-    fn apply(&self, cells: &mut HashSet<Position>, grid_width: i32, grid_height: i32, wrap_world: bool, x: i32, y: i32) {
+    fn apply(&self, ctx: &mut PatternContext, x: i32, y: i32) {
         for (dx,dy) in [(6,0),(0,1),(1,1),(1,2),(5,2),(6,2),(7,2)] { 
-            self.add_cell_to_pattern(cells, grid_width, grid_height, wrap_world, x+dx, y+dy); 
+            ctx.add_cell(x+dx, y+dy); 
         }
     }
 }
@@ -171,7 +182,7 @@ impl Pattern for GosperGunPattern {
         "Gosper Gun"
     }
     
-    fn apply(&self, cells: &mut HashSet<Position>, grid_width: i32, grid_height: i32, wrap_world: bool, x: i32, y: i32) {
+    fn apply(&self, ctx: &mut PatternContext, x: i32, y: i32) {
         let pts = [
             (24,0),(22,1),(24,1),(12,2),(13,2),(20,2),(21,2),(34,2),(35,2),
             (11,3),(15,3),(20,3),(21,3),(34,3),(35,3),(0,4),(1,4),(10,4),(16,4),
@@ -179,7 +190,7 @@ impl Pattern for GosperGunPattern {
             (10,6),(16,6),(24,6),(11,7),(15,7),(12,8),(13,8),
         ];
         for (dx,dy) in pts { 
-            self.add_cell_to_pattern(cells, grid_width, grid_height, wrap_world, x+dx, y+dy); 
+            ctx.add_cell(x+dx, y+dy); 
         }
     }
 }
@@ -192,9 +203,9 @@ impl Pattern for PentadecathlonPattern {
         "Pentadecathlon"
     }
     
-    fn apply(&self, cells: &mut HashSet<Position>, grid_width: i32, grid_height: i32, wrap_world: bool, x: i32, y: i32) {
+    fn apply(&self, ctx: &mut PatternContext, x: i32, y: i32) {
         for (dx,dy) in [(0,0),(1,0),(2,0),(3,0),(1,-1),(1,1),(4,-1),(4,1),(5,0),(6,0),(7,0),(8,0)] {
-            self.add_cell_to_pattern(cells, grid_width, grid_height, wrap_world, x+dx, y+dy);
+            ctx.add_cell(x+dx, y+dy);
         }
     }
 }
@@ -203,7 +214,7 @@ impl Pattern for PentadecathlonPattern {
 pub fn get_pattern_by_index(index: usize) -> Box<dyn Pattern> {
     match index {
         0 => Box::new(GliderPattern),
-        1 => Box::new(RandomPattern::new(crate::config::RANDOM_DENSITY)),
+        1 => Box::new(RandomPattern::new(RANDOM_DENSITY)),
         2 => Box::new(BlockPattern),
         3 => Box::new(BlinkerPattern),
         4 => Box::new(BeaconPattern),
@@ -216,10 +227,3 @@ pub fn get_pattern_by_index(index: usize) -> Box<dyn Pattern> {
     }
 }
 
-/// Get all pattern names for the menu
-pub fn get_pattern_names() -> Vec<&'static str> {
-    vec![
-        "Glider", "Random", "Block", "Blinker", "Beacon",
-        "R-pentomino", "Acorn", "Diehard", "Gosper Gun", "Pentadecathlon",
-    ]
-}
